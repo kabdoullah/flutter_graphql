@@ -12,7 +12,6 @@ class HomeScreen extends StatefulWidget {
 }
 
 class _HomeScreenState extends State<HomeScreen> {
-  int _page = 1;
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -20,64 +19,95 @@ class _HomeScreenState extends State<HomeScreen> {
         title: const Text("Todos"),
         centerTitle: true,
       ),
-      body: Column(
-        children: [
-          Query(
-            options: QueryOptions(
-              document: gql(todoPaginationQuery),
+      body: Query(
+        options: QueryOptions(
+          document: gql(todoPaginationQuery),
+          variables: const {
+            "options": {
+              "paginate": {"page": 1, "limit": 10}
+            }
+          },
+        ),
+        builder: (result, {fetchMore, refetch}) {
+          if (result.hasException) {
+            return Text(result.exception.toString());
+          }
+          if (result.isLoading) {
+            return const Center(
+              child: CircularProgressIndicator(),
+            );
+          }
+          List? todos = result.data?['todos']['data'];
+          int? nextPage = result.data?['todos']?['links']?['next']?['page'];
+          print("NextPage    : $nextPage");
+          final opts = FetchMoreOptions(
               variables: {
                 "options": {
-                  "paginate": {"page": _page, "limit": 10}
+                  "paginate": {"page": nextPage, "limit": 10}
                 }
               },
-            ),
-            builder: (result, {fetchMore, refetch}) {
-              if (result.hasException) {
-                return Text(result.exception.toString());
-              }
-              if (result.isLoading) {
-                return const Center(
-                  child: CircularProgressIndicator(),
-                );
-              }
-              List? todos = result.data?['todos']['data'];
-              if (todos == null) {
-                return const Text('No todo');
-              }
-              print("todos   $todos");
-              return Expanded(
-                child: ListView.builder(
-                  itemCount: todos.length,
-                  itemBuilder: (context, index) {
-                    final todo = todos[index];
-                    return ListTile(
-                      leading: Text(todo['id']),
-                      title: Text(todo['title']),
-                      trailing: Checkbox(
-                          onChanged: (value) {}, value: todo['completed']),
-                      onTap: () {
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (context) => DetailScreen(id: todo['id']),
-                          ),
-                        );
-                      },
-                    );
-                  },
-                ),
+              updateQuery: (previousResultData, fetchMoreResultData) {
+                final List<dynamic> repos = [
+                  ...previousResultData?['todos']['data'] as List<dynamic>,
+                  ...fetchMoreResultData?['todos']['data'] as List<dynamic>
+                ];
+
+                fetchMoreResultData?['todos']['data'] = repos;
+
+                return fetchMoreResultData;
+              });
+
+          if (todos == null) {
+            return const Text('No todo');
+          }
+          return ListView.builder(
+            itemCount: todos.length,
+            itemBuilder: (context, index) {
+              final todo = todos[index];
+              return Column(
+                children: [
+                  ListTile(
+                    leading: Text(todo['id']),
+                    title: Text(todo['title']),
+                    trailing: Checkbox(
+                        onChanged: (value) {}, value: todo['completed']),
+                    onTap: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => DetailScreen(id: todo['id']),
+                        ),
+                      );
+                    },
+                  ),
+                  if (todos.length - 1 == index)
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        nextPage == null
+                            ? Container()
+                            : ElevatedButton(
+                                onPressed: () {
+                                  fetchMore!(opts);
+                                },
+                                child: const Text("Load more"),
+                              ),
+                        const SizedBox(
+                          width: 15,
+                        ),
+                        ElevatedButton(
+                          onPressed: () {
+                            refetch!();
+                          },
+                          child: const Text("Refresh"),
+                        ),
+                      ],
+                    )
+                ],
               );
             },
-          ),
-          ElevatedButton(
-            onPressed: () {
-              setState(() {
-                _page = _page + 1;
-              });
-            },
-            child: const Text("Load more"),
-          ),
-        ],
+          );
+        },
       ),
       floatingActionButton: Column(
         mainAxisAlignment: MainAxisAlignment.end,

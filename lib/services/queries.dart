@@ -22,7 +22,6 @@ query todo(\$id : ID!) {
 
 """;
 
-
 String todoPaginationQuery = """
 query Todos(\$options: PageQueryOptions) {
   todos(options: \$options) {
@@ -31,13 +30,14 @@ query Todos(\$options: PageQueryOptions) {
       title
       completed
     }
-    meta {
-      totalCount
+    links {
+      next{
+        page
+      }
     }
   }
 }
  """;
-
 
 //Mutation
 String createTodo = """ 
@@ -64,4 +64,3 @@ mutation DeleteTodo(\$id: ID!){
   deleteTodo(id: \$id)
 }
 """;
-
